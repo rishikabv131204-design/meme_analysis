@@ -1,0 +1,11 @@
+image,Image Caption,Extracted Meme Text,Meme Summary,Sentiment Analysis,timestamp
+.gradio\flagged\image\bc05796c31a31407a6fa\image_1.jpg,"A meme featuring Woody and Buzz Lightyear from Toy Story, with Buzz pointing and saying ""Look there my friend, now all sohai ikut trend play the 10years challenge at Facebook"".","LOOK THERE MY FRIEND
+NOW ALL SOHAI IKUT TREND PLAY
+THE 1OYEARS CHALLENGE AT FACEBOOK
+imgfip_com
+Aa4i","The caption and meme text are virtually identical, describing a meme image of Buzz Lightyear pointing excitedly while commenting on the ubiquitous ""10-year challenge"" on Facebook, calling those participating ""sohai"" (a Malaysian slang term roughly translating to ""fool"" or ""idiot""). The humor derives from Buzz, a character known for his seriousness and heroism, ironically pointing out and mocking the popular trend, using a slightly derogatory term.  The meme is humorous and slightly sarcastic, playing on the unexpected juxtaposition of a beloved children's character criticizing a social media trend.","Sentiment: 2
+Emotion: 1
+Humor: 1
+Sarcasm: 0
+Offensive: 1
+Motivation: 1",2025-09-19 14:57:13.652071

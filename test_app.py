@@ -135,6 +135,32 @@ def extract_key_frame(path):
 # ------------------------------------------------
 # 🔄 5. Full Pipeline
 # ------------------------------------------------
+def process_image(image):
+    if image is None:
+        return "Upload an image.","N/A","N/A","N/A"
+    
+    caption = generate_caption(image)
+    ocr = ocr_reader.readtext(np.array(image))
+    text = clean_ocr_text("\n".join([t[1] for t in ocr]))
+    explanation = explain_meme(caption, text)
+
+    try:
+        preds = stage2_model.forward(explanation)
+        choose = lambda t: torch.argmax(torch.softmax(t, dim=1)).item()
+        result = "\n".join([
+            f"Sentiment:  {choose(preds['sentiment'])}",
+            f"Emotion:    {choose(preds['emotion'])}",
+            f"Humor:      {choose(preds['humor'])}",
+            f"Sarcasm:    {choose(preds['sarcasm'])}",
+            f"Offensive:  {choose(preds['offensive'])}",
+            f"Motivation: {choose(preds['motivation'])}"
+        ])
+    except Exception as e:
+        result = f"Error in Stage 2: {e}"
+
+    return caption, text, explanation, result
+
+
 def process_video(video):
     if video is None:
         return "Upload a video.","N/A","N/A","N/A"
@@ -211,7 +237,7 @@ label .input-container, .input-container.svelte-1ae7ssi {
 # ------------------------------------------------
 # 🎛 7. Gradio Interface
 # ------------------------------------------------
-interface = gr.Interface(
+interface_video = gr.Interface(
     fn=process_video,
     inputs=gr.Video(label="Upload Meme Video"),
     outputs=[
@@ -220,9 +246,29 @@ interface = gr.Interface(
         gr.Textbox(label="Meme Explanation", elem_id="big-text", lines=8, placeholder="Meme Explanation..."),
         gr.Textbox(label="Sentiment & Emotion Analysis", elem_id="big-text", lines=4, placeholder="Sentiment & Emotion Analysis...")
     ],
-    title="🎥 Meme Interpretation Pipeline (Video Version)",
+    title="🎥 Meme Interpretation Pipeline",
     description="Upload a meme video — extracts a key frame, describes it, explains humor, and classifies tone.",
     css=custom_css
+)
+
+interface_image = gr.Interface(
+    fn=process_image,
+    inputs=gr.Image(type="pil", label="Upload Meme Image"),
+    outputs=[
+        gr.Textbox(label="Generated Caption", elem_id="big-text", lines=3, placeholder="Generated Caption..."),
+        gr.Textbox(label="Extracted Text", elem_id="big-text", lines=10, placeholder="Extracted OCR Text..."),
+        gr.Textbox(label="Meme Explanation", elem_id="big-text", lines=8, placeholder="Meme Explanation..."),
+        gr.Textbox(label="Sentiment & Emotion Analysis", elem_id="big-text", lines=4, placeholder="Sentiment & Emotion Analysis...")
+    ],
+    title="🖼️ Meme Interpretation Pipeline",
+    description="Upload a meme image — describes it, explains humor, and classifies tone.",
+    css=custom_css
+)
+
+interface = gr.TabbedInterface(
+    interface_list=[interface_image, interface_video],
+    tab_names=["🖼️ Image Meme", "🎥 Video Meme"],
+    title="🎥 Memesense"
 )
 
 if __name__ == "__main__":

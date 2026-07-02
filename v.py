@@ -10,14 +10,14 @@ import google.generativeai as genai
 from keybert import KeyBERT
 from transformers import BertTokenizer, BertModel
 
-print("🚀 Starting Meme Interpretation App")
+print("Starting Meme Interpretation App")
 
 
 #  1. Setup
 
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+gemini_model = genai.GenerativeModel("gemini-2.5-flash")
 ocr_reader = easyocr.Reader(['en'])
 device = "cuda" if torch.cuda.is_available() else "cpu"
 kw_model = KeyBERT()
@@ -102,7 +102,7 @@ class MultiTaskClassifier(nn.Module):
 
 class Stage2Pipeline:
     def __init__(self):
-        print("✅ Stage2Pipeline constructor running...")
+        print("Stage2Pipeline constructor running...")
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         self.uet = UETBlock().to(device)
         self.mtl = MultiTaskClassifier().to(device)
@@ -118,7 +118,7 @@ class Stage2Pipeline:
         return self.mtl(pooled)
 
 stage2_model = Stage2Pipeline()
-print("✅ Stage2Pipeline initialized successfully!\n")
+print("Stage2Pipeline initialized successfully!\n")
 
 
 #  4. Video Handling
@@ -134,6 +134,32 @@ def extract_key_frame(path):
 
 
 # 🔄 5. Full Pipeline
+
+def process_image(image):
+    if image is None:
+        return "Upload an image.","N/A","N/A","N/A"
+    
+    caption = generate_caption(image)
+    ocr = ocr_reader.readtext(np.array(image))
+    text = clean_ocr_text("\n".join([t[1] for t in ocr]))
+    explanation = explain_meme(caption, text)
+
+    try:
+        preds = stage2_model.forward(explanation)
+        choose = lambda t: torch.argmax(torch.softmax(t, dim=1)).item()
+        result = "\n".join([
+            f"Sentiment:  {choose(preds['sentiment'])}",
+            f"Emotion:    {choose(preds['emotion'])}",
+            f"Humor:      {choose(preds['humor'])}",
+            f"Sarcasm:    {choose(preds['sarcasm'])}",
+            f"Offensive:  {choose(preds['offensive'])}",
+            f"Motivation: {choose(preds['motivation'])}"
+        ])
+    except Exception as e:
+        result = f"Error in Stage 2: {e}"
+
+    return caption, text, explanation, result
+
 
 def process_video(video):
     if video is None:
@@ -313,18 +339,30 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Soft(primary_hue="blue", neutral_
     gr.HTML("<h1>🎥 Memesense</h1>")
     # gr.HTML("<p class='subtitle'>Decode Humor, Emotion & Context from Meme Videos Instantly</p>")
 
-    # Simple Upload Box
-    with gr.Row():
-        with gr.Column(elem_classes="upload-container"):
-            video_input = gr.Video(
-                label="📤 Upload Meme Video",
-                elem_classes="upload-box"
-            )
+    # Tabbed Upload Area
+    with gr.Tabs():
+        with gr.Tab("🖼️ Image Meme"):
+            with gr.Row():
+                with gr.Column(elem_classes="upload-container"):
+                    image_input = gr.Image(
+                        type="pil",
+                        label="📤 Upload Meme Image",
+                        elem_classes="upload-box"
+                    )
+            with gr.Row(elem_classes="big-buttons"):
+                analyze_img_btn = gr.Button("🔍 Analyze Image Meme", elem_classes="analyze-btn")
+                clear_img_btn = gr.Button("🧹 Clear", elem_classes="clear-btn")
 
-    # Dual Buttons
-    with gr.Row(elem_classes="big-buttons"):
-        analyze_btn = gr.Button("🔍 Analyze Meme", elem_classes="analyze-btn")
-        clear_btn = gr.Button("🧹 Clear", elem_classes="clear-btn")
+        with gr.Tab("🎥 Video Meme"):
+            with gr.Row():
+                with gr.Column(elem_classes="upload-container"):
+                    video_input = gr.Video(
+                        label="📤 Upload Meme Video",
+                        elem_classes="upload-box"
+                    )
+            with gr.Row(elem_classes="big-buttons"):
+                analyze_vid_btn = gr.Button("🔍 Analyze Video Meme", elem_classes="analyze-btn")
+                clear_vid_btn = gr.Button("🧹 Clear", elem_classes="clear-btn")
 
     # Output Layout
     with gr.Row(elem_classes="output-grid"):
@@ -356,16 +394,30 @@ with gr.Blocks(css=custom_css, theme=gr.themes.Soft(primary_hue="blue", neutral_
             )
 
     # Button Connections
-    analyze_btn.click(
+    analyze_vid_btn.click(
         fn=process_video,
         inputs=video_input,
         outputs=[caption_output, text_output, explanation_output, analysis_output]
     )
-
-    clear_btn.click(
-        fn=lambda: ("", "", "", ""),
-        inputs=[],
+    
+    analyze_img_btn.click(
+        fn=process_image,
+        inputs=image_input,
         outputs=[caption_output, text_output, explanation_output, analysis_output]
+    )
+
+    def clear_all():
+        return None, None, "", "", "", ""
+
+    clear_vid_btn.click(
+        fn=clear_all,
+        inputs=[],
+        outputs=[video_input, image_input, caption_output, text_output, explanation_output, analysis_output]
+    )
+    clear_img_btn.click(
+        fn=clear_all,
+        inputs=[],
+        outputs=[video_input, image_input, caption_output, text_output, explanation_output, analysis_output]
     )
 
 if __name__ == "__main__":
